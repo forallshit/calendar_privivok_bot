@@ -231,7 +231,7 @@ async def cmd_done(message: Message):
     # если ребёнок один — сразу показываем его прививки
     # если несколько — сначала даём выбрать ребёнка
     if len(children) == 1:
-        await show_vaccine_buttons(message, children[0][0], children[0][1])
+        await show_vaccine_buttons(message, message.from_user.id, children[0][0], children[0][1])
     else:
         buttons = [
             [InlineKeyboardButton(text=name, callback_data=f"pickchild:{child_id}")]
@@ -241,10 +241,18 @@ async def cmd_done(message: Message):
         await message.answer("Какого ребёнка?", reply_markup=keyboard)
 
 
-async def show_vaccine_buttons(message: Message, child_id: int, child_name: str):
-    """Показывает кнопки с несделанными прививками для отметки."""
-    children = database.get_children(message.from_user.id)
-    birth_date_str = next(b for cid, n, b in children if cid == child_id)
+async def show_vaccine_buttons(message: Message, user_id: int, child_id: int, child_name: str):
+    """Показывает кнопки с несделанными прививками для отметки.
+    user_id передаётся явно, а не берётся из message.from_user.id — потому что
+    когда это сообщение бота (например, при нажатии кнопки под /list), from_user
+    там указывает на самого бота, а не на человека, который нажал кнопку."""
+    children = database.get_children(user_id)
+    birth_date_str = next((b for cid, n, b in children if cid == child_id), None)
+
+    if birth_date_str is None:
+        await message.answer("Не нашёл этого ребёнка. Попробуй /list ещё раз.")
+        return
+
     birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
 
     schedule = vaccines.get_vaccines_for_child(birth_date, date.today())
@@ -280,7 +288,7 @@ async def on_show_done(callback: CallbackQuery):
         await callback.answer("Не нашёл такого ребёнка", show_alert=True)
         return
 
-    await show_vaccine_buttons(callback.message, child_id, child_name)
+    await show_vaccine_buttons(callback.message, callback.from_user.id, child_id, child_name)
     await callback.answer()
 
 
@@ -295,7 +303,7 @@ async def on_pick_child(callback: CallbackQuery):
         return
 
     await callback.message.delete()
-    await show_vaccine_buttons(callback.message, child_id, child_name)
+    await show_vaccine_buttons(callback.message, callback.from_user.id, child_id, child_name)
     await callback.answer()
 
 
