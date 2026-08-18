@@ -10,61 +10,73 @@
 
 VACCINE_SCHEDULE = [
     {
+        "id": "hep_b_1",
         "days": 1,
         "name": "Гепатит B (1-я вакцинация)",
         "info": "Делается в первые 24 часа жизни, обычно ещё в роддоме.",
     },
     {
+        "id": "bcg",
         "days": 3,
         "name": "БЦЖ (туберкулёз)",
         "info": "Делается на 3-7 день жизни, обычно ещё в роддоме.",
     },
     {
+        "id": "hep_b_2",
         "days": 30,
         "name": "Гепатит B (2-я вакцинация)",
         "info": "В 1 месяц.",
     },
     {
+        "id": "akds_1",
         "days": 90,
         "name": "АКДС + полиомиелит + гемофильная инфекция (1-я)",
         "info": "В 3 месяца. Защита от коклюша, дифтерии, столбняка, полиомиелита.",
     },
     {
+        "id": "akds_2",
         "days": 135,
         "name": "АКДС + полиомиелит + гемофильная инфекция (2-я)",
         "info": "В 4.5 месяца.",
     },
     {
+        "id": "akds_3",
         "days": 180,
         "name": "АКДС + полиомиелит + гемофильная инфекция (3-я) + Гепатит B (3-я)",
         "info": "В 6 месяцев.",
     },
     {
+        "id": "kpk",
         "days": 365,
         "name": "Корь, краснуха, паротит (КПК)",
         "info": "В 12 месяцев.",
     },
     {
+        "id": "polio_r1",
         "days": 548,
         "name": "Ревакцинация полиомиелит (1-я)",
         "info": "В 18 месяцев.",
     },
     {
+        "id": "akds_r1",
         "days": 548,
         "name": "Ревакцинация АКДС",
         "info": "В 18 месяцев.",
     },
     {
+        "id": "polio_r2",
         "days": 730,
         "name": "Ревакцинация полиомиелит (2-я)",
         "info": "В 20 месяцев.",
     },
     {
+        "id": "ads_m_r",
         "days": 2190,
         "name": "Ревакцинация АДС-М, полиомиелит",
         "info": "В 6 лет.",
     },
     {
+        "id": "bcg_r",
         "days": 2555,
         "name": "Ревакцинация БЦЖ",
         "info": "В 7 лет (по показаниям, если нет иммунитета к туберкулёзу).",
@@ -82,9 +94,17 @@ def get_vaccines_for_child(birth_date, today):
         from datetime import timedelta
         due_date = birth_date + timedelta(days=v["days"])
         results.append({
+            "id": v["id"],
             "name": v["name"],
             "info": v["info"],
             "due_date": due_date,
             "days_left": (due_date - today).days,
         })
     return results
+
+
+def get_vaccine_name_by_id(vaccine_id: str):
+    for v in VACCINE_SCHEDULE:
+        if v["id"] == vaccine_id:
+            return v["name"]
+    return vaccine_id
