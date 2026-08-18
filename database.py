@@ -111,3 +111,15 @@ def get_completed_vaccine_ids(child_id: int):
             (child_id,),
         )
         return {row[0] for row in cursor.fetchall()}
+
+
+def get_completed_vaccines_with_dates(child_id: int):
+    """Возвращает список (vaccine_id, completed_date) сделанных прививок этого ребёнка,
+    отсортированный по дате выполнения."""
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "SELECT vaccine_id, completed_date FROM completed_vaccines "
+            "WHERE child_id = ? ORDER BY completed_date",
+            (child_id,),
+        )
+        return cursor.fetchall()
