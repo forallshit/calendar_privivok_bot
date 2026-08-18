@@ -61,6 +61,7 @@ async def cmd_start(message: Message):
         "/add — добавить ребёнка\n"
         "/list — мои дети и ближайшие прививки\n"
         "/done — отметить прививку как сделанную\n"
+        "/completed — уже сделанные прививки с датами\n"
         "/help — что я умею"
     )
     await message.answer(text)
@@ -73,7 +74,8 @@ async def cmd_help(message: Message):
         "Раз в день проверяю, у кого скоро прививка, и присылаю напоминание заранее.\n\n"
         "/add — добавить ребёнка\n"
         "/list — посмотреть детей и ближайшие прививки\n"
-        "/done — отметить прививку как сделанную (чтобы не напоминал зря)"
+        "/done — отметить прививку как сделанную (чтобы не напоминал зря)\n"
+        "/completed — посмотреть уже сделанные прививки с датами"
     )
 
 
@@ -183,6 +185,38 @@ async def cmd_list(message: Message):
             InlineKeyboardButton(text="✅ Отметить прививку", callback_data=f"showdone:{child_id}")
         ]])
         await message.answer("\n\n".join(blocks), reply_markup=mark_button)
+
+
+# ==== Уже сделанные прививки с датами ====
+@router.message(Command("completed"))
+async def cmd_completed(message: Message):
+    children = database.get_children(message.from_user.id)
+
+    if not children:
+        await message.answer("У тебя пока нет добавленных детей. Добавь через /add")
+        return
+
+    any_completed = False
+
+    for child_id, name, birth_date_str in children:
+        completed = database.get_completed_vaccines_with_dates(child_id)
+
+        if not completed:
+            continue
+
+        any_completed = True
+        lines = [f"👶 <b>{name}</b> — сделанные прививки:"]
+        for vaccine_id, completed_date in completed:
+            vaccine_name = vaccines.get_vaccine_name_by_id(vaccine_id)
+            date_formatted = datetime.strptime(completed_date, "%Y-%m-%d").strftime("%d.%m.%Y")
+            lines.append(f"✅ {vaccine_name} — {date_formatted}")
+
+        await message.answer("\n".join(lines))
+
+    if not any_completed:
+        await message.answer(
+            "Пока нет отмеченных прививок. Отметить можно через /done"
+        )
 
 
 # ==== Отметить прививку как сделанную ====
