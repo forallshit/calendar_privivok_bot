@@ -21,6 +21,15 @@ def init_db():
                 birth_date TEXT NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS completed_vaccines (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                child_id INTEGER NOT NULL,
+                vaccine_id TEXT NOT NULL,
+                completed_date TEXT NOT NULL,
+                UNIQUE(child_id, vaccine_id)
+            )
+        """)
         conn.commit()
 
 
@@ -57,7 +66,7 @@ def get_all_children():
     """Возвращает всех детей всех пользователей — нужно для планировщика напоминаний."""
     with get_connection() as conn:
         cursor = conn.execute(
-            "SELECT telegram_user_id, name, birth_date FROM children"
+            "SELECT id, telegram_user_id, name, birth_date FROM children"
         )
         return cursor.fetchall()
 
@@ -69,3 +78,36 @@ def delete_child(child_id: int, telegram_user_id: int):
             (child_id, telegram_user_id),
         )
         conn.commit()
+
+
+def mark_vaccine_done(child_id: int, vaccine_id: str, completed_date: str):
+    """Отмечает прививку как сделанную. Если уже отмечена — просто обновляет дату."""
+    with get_connection() as conn:
+        conn.execute(
+            """INSERT INTO completed_vaccines (child_id, vaccine_id, completed_date)
+               VALUES (?, ?, ?)
+               ON CONFLICT(child_id, vaccine_id)
+               DO UPDATE SET completed_date = excluded.completed_date""",
+            (child_id, vaccine_id, completed_date),
+        )
+        conn.commit()
+
+
+def unmark_vaccine_done(child_id: int, vaccine_id: str):
+    """Убирает отметку "сделано" (на случай, если отметили по ошибке)."""
+    with get_connection() as conn:
+        conn.execute(
+            "DELETE FROM completed_vaccines WHERE child_id = ? AND vaccine_id = ?",
+            (child_id, vaccine_id),
+        )
+        conn.commit()
+
+
+def get_completed_vaccine_ids(child_id: int):
+    """Возвращает множество vaccine_id, которые уже отмечены сделанными у этого ребёнка."""
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "SELECT vaccine_id FROM completed_vaccines WHERE child_id = ?",
+            (child_id,),
+        )
+        return {row[0] for row in cursor.fetchall()}
