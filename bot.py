@@ -16,6 +16,8 @@ import os
 from datetime import datetime, date
 
 from aiogram import Bot, Dispatcher, Router, F
+from aiogram.enums import ParseMode
+from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -138,7 +140,6 @@ async def cmd_list(message: Message):
         return
 
     today = date.today()
-    reply_lines = []
 
     for child_id, name, birth_date_str in children:
         birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
@@ -149,26 +150,39 @@ async def cmd_list(message: Message):
         upcoming = [v for v in schedule if v["days_left"] >= -30]
         upcoming.sort(key=lambda v: v["days_left"])
 
-        reply_lines.append(f"👶 {name} (родился {birth_date.strftime('%d.%m.%Y')})")
+        # заголовок по ребёнку — отдельным сообщением, чтобы не сливалось с остальным
+        header = f"👶 <b>{name}</b> (родился {birth_date.strftime('%d.%m.%Y')})"
+        await message.answer(header)
 
         if not upcoming:
-            reply_lines.append("  Все прививки по базовому графику пройдены.")
-        else:
-            for v in upcoming[:6]:  # показываем ближайшие 6
-                if v["id"] in completed_ids:
-                    reply_lines.append(f"  ✅ {v['name']} — сделано")
-                    continue
-                if v["days_left"] < 0:
-                    status = f"была {abs(v['days_left'])} дн. назад"
-                elif v["days_left"] == 0:
-                    status = "СЕГОДНЯ"
-                else:
-                    status = f"через {v['days_left']} дн. ({v['due_date'].strftime('%d.%m.%Y')})"
-                reply_lines.append(f"  • {v['name']} — {status}")
-        reply_lines.append("")
+            await message.answer("Все прививки по базовому графику пройдены. ✅")
+            continue
 
-    reply_lines.append("Отметить прививку сделанной — /done")
-    await message.answer("\n".join(reply_lines))
+        blocks = []
+        for v in upcoming[:6]:  # показываем ближайшие 6
+            if v["id"] in completed_ids:
+                blocks.append(f"✅ <b>{v['name']}</b>\nсделано")
+                continue
+            if v["days_left"] < 0:
+                icon = "⚪️"
+                status = f"была {abs(v['days_left'])} дн. назад"
+            elif v["days_left"] == 0:
+                icon = "🔴"
+                status = "СЕГОДНЯ"
+            elif v["days_left"] <= 7:
+                icon = "🟡"
+                status = f"через {v['days_left']} дн. ({v['due_date'].strftime('%d.%m.%Y')})"
+            else:
+                icon = "⚪️"
+                status = f"через {v['days_left']} дн. ({v['due_date'].strftime('%d.%m.%Y')})"
+            blocks.append(f"{icon} <b>{v['name']}</b>\n{status}")
+
+        # каждая прививка — отдельным абзацем, разделённым пустой строкой
+        # кнопка сразу ведёт к отметке прививок именно этого ребёнка
+        mark_button = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Отметить прививку", callback_data=f"showdone:{child_id}")
+        ]])
+        await message.answer("\n\n".join(blocks), reply_markup=mark_button)
 
 
 # ==== Отметить прививку как сделанную ====
@@ -222,6 +236,20 @@ async def show_vaccine_buttons(message: Message, child_id: int, child_name: str)
     )
 
 
+@router.callback_query(F.data.startswith("showdone:"))
+async def on_show_done(callback: CallbackQuery):
+    child_id = int(callback.data.split(":")[1])
+    children = database.get_children(callback.from_user.id)
+    child_name = next((n for cid, n, _ in children if cid == child_id), None)
+
+    if child_name is None:
+        await callback.answer("Не нашёл такого ребёнка", show_alert=True)
+        return
+
+    await show_vaccine_buttons(callback.message, child_id, child_name)
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("pickchild:"))
 async def on_pick_child(callback: CallbackQuery):
     child_id = int(callback.data.split(":")[1])
@@ -256,7 +284,7 @@ async def on_mark_done(callback: CallbackQuery):
 async def main():
     database.init_db()
 
-    bot = Bot(token=BOT_TOKEN)
+    bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(router)
 
@@ -269,5 +297,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-            
