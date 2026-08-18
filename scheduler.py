@@ -26,11 +26,14 @@ async def check_and_notify(bot: Bot):
     today = date.today()
     all_children = database.get_all_children()
 
-    for telegram_user_id, name, birth_date_str in all_children:
+    for child_id, telegram_user_id, name, birth_date_str in all_children:
         birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
         schedule = vaccines.get_vaccines_for_child(birth_date, today)
+        completed_ids = database.get_completed_vaccine_ids(child_id)
 
         for v in schedule:
+            if v["id"] in completed_ids:
+                continue  # уже отмечено сделанным — не напоминаем
             if v["days_left"] in REMIND_DAYS_BEFORE:
                 if v["days_left"] == 0:
                     when_text = "СЕГОДНЯ"
