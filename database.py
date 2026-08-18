@@ -5,9 +5,14 @@
 """
 
 import sqlite3
+import os
 from contextlib import contextmanager
 
-DB_PATH = "privivki_bot.db"
+# Путь к файлу базы данных. Если задана переменная окружения DB_PATH
+# (например, указывает на подключённый Railway Volume) — используем её,
+# иначе базу данных храним рядом с кодом (подходит только для локальных тестов,
+# на Railway без Volume данные будут теряться при каждом новом деплое).
+DB_PATH = os.getenv("DB_PATH", "privivki_bot.db")
 
 
 def init_db():
